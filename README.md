@@ -7,7 +7,7 @@ Hand-written PyTorch implementations of the Transformer family, with no `nn.Tran
 | [`transformer.py`](transformer.py) | `Attention`, `Block`, `MiniGPT` (decoder-only), `BERT` (encoder-only), `Seq2Seq` (encoder-decoder) |
 | [`bpe.py`](bpe.py) | Byte-level BPE tokenizer (the GPT-2 algorithm): train, encode, decode, with no unknown tokens |
 | [`slm_minigpt.ipynb`](slm_minigpt.ipynb) | GPT trained on Dostoevsky, Kafka, Plato, Shakespeare, Blake, with a char or BPE tokenizer. Covers sampling, KV cache, attention heatmaps, MHA/GQA/MQA |
-| [`bert.ipynb`](bert.ipynb) | BERT with masked language modelling on the same corpus, using BPE tokens. Fill-in-the-blank, bidirectional context, padding mask |
+| [`bert.ipynb`](bert.ipynb) | BERT with masked language modelling on the same corpus, using BPE tokens. **~29% masked-token accuracy** over 1026 tokens (`He did not [MASK] what to say` → ` know`). Fill-in-the-blank, bidirectional context, padding mask |
 | [`seq2seq.ipynb`](seq2seq.ipynb) | Encoder-decoder that normalizes dates (`"Saturday, 31 October 2026"` → `2026-10-31`). **99.7% exact match on unseen dates**, with cross-attention alignment plots |
 | [`tests.py`](tests.py) | Behavioural tests: each mask blocks what it should, the KV cache matches a full forward pass, BERT sees both directions, BPE round-trips any string |
 
