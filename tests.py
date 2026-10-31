@@ -1,8 +1,9 @@
-"""Behavioural checks for every attention variant. Run: python test_transformer.py"""
+"""Behavioural checks for every attention variant, BERT and the BPE tokenizer. Run: python tests.py"""
 
 import torch
 
-from transformer import Attention, MiniGPT, Seq2Seq
+from bpe import BPE, PRETOKENIZE
+from transformer import BERT, Attention, MiniGPT, Seq2Seq
 
 torch.manual_seed(0)
 D, H = 32, 4
@@ -83,6 +84,27 @@ def test_seq2seq_shapes_and_greedy():
     src, tgt = torch.randint(1, 20, (3, 9)), torch.randint(1, 20, (3, 6))
     assert model(src, tgt).shape == (3, 6, 20)
     assert model.greedy(src, bos_id=1, eos_id=2, max_new=10).size(1) <= 11
+
+
+def test_bert_is_bidirectional_and_ignores_padding():
+    model = BERT(20, 16, D, 2, H, pad_id=0).eval()
+    idx = torch.randint(1, 20, (1, 8))
+    changed = idx.clone()
+    changed[0, 6] = (idx[0, 6] % 19) + 1                           # change a LATER token
+    assert not close(model(idx)[:, :6], model(changed)[:, :6])     # earlier outputs see it
+    padded = torch.cat([idx, torch.zeros(1, 5, dtype=torch.long)], dim=1)
+    assert close(model(idx), model(padded)[:, :8])                 # trailing pads change nothing
+
+
+def test_bpe_round_trip_and_merges():
+    corpus = "the cat sat on the mat. the cat ate the rat! " * 20
+    tok = BPE.train(corpus, 300)
+    assert 256 < tok.vocab_size <= 300                             # stops early once every word is one token
+    for s in [corpus, "unseen wörds, émojis 🙂 and tabs\t\n", "_under_scores_", ""]:
+        assert "".join(PRETOKENIZE.findall(s)) == s               # pre-tokenizer drops nothing
+        assert tok.decode(tok.encode(s)) == s                     # byte-level: anything round-trips
+    assert len(tok.encode(corpus)) < len(corpus.encode()) / 3     # frequent words collapse to few tokens
+    assert tok.pieces(" the cat") == [" the", " cat"]
 
 
 if __name__ == "__main__":

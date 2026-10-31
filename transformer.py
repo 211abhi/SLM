@@ -16,6 +16,8 @@ class and the variants are flags:
     multi-query (MQA)       n_kv_heads = 1              (PaLM, Falcon)
     sliding-window          window=w                    (Mistral, Longformer-style local)
     KV cache                forward(x, cache={})        (fast autoregressive decoding)
+
+Models: MiniGPT (decoder-only), BERT (encoder-only), Seq2Seq (encoder-decoder).
 """
 
 import math
@@ -182,6 +184,26 @@ class MiniGPT(nn.Module):
             nxt = torch.multinomial(F.softmax(logits, dim=-1), 1)
             idx = torch.cat([idx, nxt], dim=1)
         return idx
+
+
+class BERT(nn.Module):
+    """Encoder-only model trained by masked language modelling: predict hidden tokens from BOTH sides."""
+
+    def __init__(self, vocab_size, context_length, dim, n_blocks, n_heads, pad_id, dropout=0.1):
+        super().__init__()
+        self.pad_id = pad_id
+        self.tok_emb = nn.Embedding(vocab_size, dim)
+        self.pos_emb = nn.Embedding(context_length, dim)
+        self.blocks = nn.ModuleList(Block(dim, n_heads, causal=False, dropout=dropout) for _ in range(n_blocks))
+        self.ln_f = nn.LayerNorm(dim)
+        self.head = nn.Linear(dim, vocab_size)
+
+    def forward(self, idx):
+        pad = idx == self.pad_id
+        x = self.tok_emb(idx) + self.pos_emb(torch.arange(idx.size(1), device=idx.device))
+        for block in self.blocks:
+            x = block(x, pad_mask=pad)          # bidirectional: every token sees every non-pad token
+        return self.head(self.ln_f(x))                                               # (B, T, vocab)
 
 
 class Seq2Seq(nn.Module):
