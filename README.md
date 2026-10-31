@@ -1,96 +1,42 @@
-# MiniGPT using Small Language Model (SLM)
+# Transformers from scratch: decoder, encoder, and every common kind of attention
 
-## 📌 Overview
+Hand-written PyTorch implementations of the Transformer family, with no `nn.Transformer` and no `scaled_dot_product_attention`. The repo contains a GPT-style language model and a full encoder-decoder, built from **one** attention module in which every variant is a flag.
 
-This project implements a **MiniGPT-style language model from scratch using PyTorch**.
-It is a **decoder-only Transformer** trained for **character-level text generation**.
+| File | What's in it |
+|---|---|
+| [`transformer.py`](transformer.py) | `Attention`, `Block`, `MiniGPT` (decoder-only), `Seq2Seq` (encoder-decoder) |
+| [`slm_minigpt.ipynb`](slm_minigpt.ipynb) | Character-level GPT trained on Dostoevsky, Kafka, Plato, Shakespeare, Blake. Covers sampling, KV cache, attention heatmaps, MHA/GQA/MQA |
+| [`seq2seq.ipynb`](seq2seq.ipynb) | Encoder-decoder that normalizes dates (`"Saturday, 31 October 2026"` → `2026-10-31`). **99.7% exact match on unseen dates**, with cross-attention alignment plots |
+| [`test_transformer.py`](test_transformer.py) | Behavioural tests: each mask blocks what it should, and the KV cache matches a full forward pass |
 
-The goal of this project is to understand how modern language models work internally, instead of relying on high-level libraries.
+## Concepts → code
 
----
+| Concept | Where | How it's checked |
+|---|---|---|
+| Scaled dot-product attention $\mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V$ | `Attention.forward` | |
+| Multi-head attention (split → attend → concatenate → project) | `Attention.forward` | |
+| **Decoder** self-attention (causal mask) | `Attention(causal=True)` | `test_causal_cannot_see_future` |
+| **Encoder** self-attention (bidirectional) | `Attention(causal=False)` | `test_encoder_sees_both_directions` |
+| **Cross-attention** (Q from decoder, K/V from encoder) | `Attention.forward(x, memory=...)` | `test_cross_attention_reads_memory`, heatmaps in `seq2seq.ipynb` |
+| Padding mask | `key_padding_mask` | `test_padding_is_ignored` |
+| Sliding-window (local) attention | `Attention(window=w)` | `test_sliding_window` |
+| Grouped-query / multi-query attention | `Attention(n_kv_heads=...)` | `test_gqa_mqa_shrink_kv` |
+| KV cache | `Attention.forward(cache=...)`, `MiniGPT.generate` | `test_kv_cache_matches_full_forward`, timing in `slm_minigpt.ipynb` |
+| Pre-LN blocks, residuals, GELU MLP | `Block` | |
+| Decoder-only LM (GPT) | `MiniGPT` | |
+| Encoder-decoder (*Attention Is All You Need*) | `Seq2Seq` | `seq2seq.ipynb` |
+| Temperature + top-k sampling, greedy decoding | `MiniGPT.generate`, `Seq2Seq.greedy` | |
 
-## Key Concepts Covered
+## Run it
 
-### 1. Transformer Architecture
+```bash
+pip install -r requirements.txt
+python test_transformer.py        # 9 checks, a few seconds
+jupyter notebook                  # seq2seq.ipynb trains in ~4 min on CPU; slm_minigpt.ipynb wants a GPU
+```
 
-* Uses a **decoder-only Transformer**
-* Stacks multiple Transformer blocks
-* Each block contains:
+## Next steps
 
-  * Self-attention
-  * Feedforward network
-  * Residual connections
-  * Layer normalization
-
----
-
-### 2. Self-Attention (Implemented from Scratch)
-
-The core idea of attention is to let each token focus on relevant past tokens.
-
-Steps implemented:
-
-* Compute **Query (Q), Key (K), Value (V)** using linear layers
-* Calculate attention scores using:
-  [
-  \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)
-  ]
-* Multiply with values to get output
-
----
-
-### 3. Causal Masking
-
-* Prevents the model from seeing future tokens
-* Implemented using a **lower triangular matrix**
-* Makes the model **autoregressive (GPT-style)**
-
----
-
-### 4. Multi-Head Attention
-
-* Splits attention into multiple heads
-* Each head learns different relationships
-* Outputs are concatenated and projected
-
----
-
-### 5. Character-Level Language Model
-
-* Text is processed at **character level**
-* Each character is mapped to an integer
-* Model predicts the **next character in sequence**
-
----
-
-## Features
-
-* Manual implementation of attention (no built-in transformer modules)
-* Modular code structure
-* Works on CPU and GPU
-* Simple and easy to understand
-
-
-
-## 📊 What the Model Does
-
-* Learns patterns from text data
-* Generates new text one character at a time
-* Demonstrates how GPT-like models work internally
-
----
-
-## 🚀 Future Improvements
-
-* Use word-level or BPE tokenization
-* Add better sampling methods (top-k, temperature)
-* Train on larger datasets
-* Optimize training and performance
-
----
-
-## 📌 Note
-
-This is a **learning-focused implementation** aimed at understanding the fundamentals of Transformers and attention mechanisms.
-
----
+- RoPE positional encoding, which would also allow a rolling KV cache past `context_length`
+- BPE tokenization instead of characters
+- An encoder-only (BERT-style) masked-language-model objective
